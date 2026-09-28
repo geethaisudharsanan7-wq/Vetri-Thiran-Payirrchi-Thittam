@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}FitBuddy - Generate Workout{% endblock %}
+{% block content %}
+<section class="hero">
+    <div class="hero-content">
+        <div class="eyebrow">AI FITNESS PLANNER</div>
+        <h1>Your AI-powered <span>fitness journey.</span></h1>
+        <p>Build a plan around your real goals, schedule and energy. FitBuddy turns a few details into a structured seven-day workout and recovery plan.</p>
+    </div>
+    <div class="hero-visual" aria-label="A seven-day plan built around your goals">
+        <div class="visual-label">Your next strongest week</div>
+        <div class="visual-stat">7 days<small>one clear plan to follow</small></div>
+    </div>
+</section>
+<section class="card">
+    <div class="eyebrow">START WITH THE BASICS</div>
+    <h2>Tell us about you</h2>
+    <p class="muted">Your answers help shape the pace, focus and recovery built into your plan.</p>
+    {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/generate-workout" class="form-grid">
+        <div class="form-group"><label for="username">Name</label><input id="username" name="username" type="text" placeholder="Enter your name" minlength="2" maxlength="120" autocomplete="name" required></div>
+        <div class="form-group"><label for="user_id">User ID</label><input id="user_id" name="user_id" type="text" placeholder="Example: user001" minlength="2" maxlength="80" required><span class="field-hint">Use the same ID when revising this plan.</span></div>
+        <div class="form-group"><label for="age">Age</label><input id="age" name="age" type="number" min="13" max="100" placeholder="25" required></div>
+        <div class="form-group"><label for="weight">Weight (kg)</label><input id="weight" name="weight" type="number" min="20" max="500" step="0.1" placeholder="70" required></div>
+        <div class="form-group"><label for="goal">Fitness goal</label><select id="goal" name="goal" required><option value="weight loss">Weight Loss</option><option value="muscle gain">Muscle Gain</option><option value="general wellness">General Wellness</option><option value="flexibility">Flexibility</option><option value="strength">Strength</option></select></div>
+        <div class="form-group"><label for="intensity">Workout intensity</label><select id="intensity" name="intensity" required><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>
+        <div class="form-submit"><button type="submit">Generate My Plan <span aria-hidden="true">&rarr;</span></button></div>
+    </form>
+</section>
+<section class="information-grid">
+    <div class="info-card"><div class="info-icon">AI</div><h3>Gemini powered</h3><p>Personalized plans shaped around your submitted profile.</p></div>
+    <div class="info-card"><div class="info-icon">7</div><h3>Seven days</h3><p>A complete day-by-day training and recovery schedule.</p></div>
+    <div class="info-card"><div class="info-icon">↻</div><h3>Feedback loop</h3><p>Revise your plan when your routine or goals change.</p></div>
+</section>
+<div class="notice"><strong>Safety notice:</strong> FitBuddy provides general wellness information. Seek appropriate professional guidance for medical conditions, injuries, pregnancy or significant dietary restrictions.</div>
+{% endblock %}

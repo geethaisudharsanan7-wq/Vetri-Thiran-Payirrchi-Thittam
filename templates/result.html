@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}FitBuddy - Your Plan{% endblock %}
+{% block content %}
+{% if success %}<div class="alert success" role="status">{{ success }}</div>{% endif %}
+<section class="page-heading"><div class="eyebrow">YOUR PERSONALIZED PLAN</div><h1>Welcome, {{ user.username }}!</h1><p>Here's your plan for the week ahead. Keep it steady, then adjust it as you learn what works.</p></section>
+<section class="card"><div class="eyebrow">YOUR STARTING POINT</div><h2>Your Profile</h2><div class="profile-grid">
+    <div class="profile-item"><span>Name</span><strong>{{ user.username }}</strong></div>
+    <div class="profile-item"><span>User ID</span><strong>{{ user.user_id }}</strong></div>
+    <div class="profile-item"><span>Age</span><strong>{{ user.age }}</strong></div>
+    <div class="profile-item"><span>Weight</span><strong>{{ user.weight }} kg</strong></div>
+    <div class="profile-item"><span>Goal</span><strong>{{ user.goal }}</strong></div>
+    <div class="profile-item"><span>Intensity</span><strong>{{ user.intensity }}</strong></div>
+</div></section>
+<section class="card"><div class="section-header"><div><div class="eyebrow">ORIGINAL PLAN</div><h2>7-Day Workout</h2></div><span class="badge">AI generated</span></div><pre class="workout-plan">{{ plan.original_plan }}</pre></section>
+{% if plan.updated_plan %}<section class="card"><div class="section-header"><div><div class="eyebrow">UPDATED PLAN</div><h2>Revised Workout</h2></div><span class="badge">Feedback applied</span></div><pre class="workout-plan">{{ plan.updated_plan }}</pre>{% if plan.feedback %}<div class="feedback-display"><strong>Your feedback</strong><p>{{ plan.feedback }}</p></div>{% endif %}</section>{% endif %}
+<section class="card nutrition-card"><div class="eyebrow">RECOVERY & NUTRITION</div><h2>One useful tip</h2><p class="nutrition-tip">{{ plan.nutrition_tip }}</p></section>
+<section class="card"><div class="eyebrow">PERSONALIZE</div><h2>Improve your plan</h2><p class="muted">Tell FitBuddy what you want changed and it will create a revised version.</p><form method="post" action="/submit-feedback"><input type="hidden" name="user_id" value="{{ user.user_id }}"><div class="form-group"><label for="feedback">Your feedback</label><textarea id="feedback" name="feedback" minlength="3" maxlength="2000" placeholder="Example: Add more cardio, reduce leg exercises, include another recovery day..." required></textarea></div><button type="submit">Update My Plan <span aria-hidden="true">&rarr;</span></button></form></section>
+<div class="action-row"><a href="/" class="secondary-button">Generate New Plan</a><a href="/feedback" class="secondary-button">Open Feedback Page</a></div>
+{% endblock %}

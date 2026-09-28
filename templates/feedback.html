@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}FitBuddy - Feedback{% endblock %}
+{% block content %}
+<section class="page-heading"><div class="eyebrow">PLAN REVISION</div><h1>Make your plan fit better.</h1><p>Tell FitBuddy what felt easy, difficult or missing. Your feedback will be used to create a revised version of your existing plan.</p></section>
+<section class="card narrow-card"><div class="eyebrow">PERSONALIZE</div><h2>What should change?</h2>{% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}<form method="post" action="/submit-feedback"><div class="form-group"><label for="user_id">User ID</label><input id="user_id" name="user_id" type="text" value="{{ user_id or '' }}" placeholder="Example: user001" required></div><div class="form-group"><label for="feedback">What would you like to change?</label><textarea id="feedback" name="feedback" minlength="3" maxlength="2000" placeholder="Example: Add more cardio and include one extra rest day." required></textarea></div><button type="submit">Revise My Plan <span aria-hidden="true">&rarr;</span></button></form></section>
+<section class="examples-grid"><div class="example-card"><strong>Cardio</strong><p>"Add more cardio exercises."</p></div><div class="example-card"><strong>Recovery</strong><p>"Include another rest day."</p></div><div class="example-card"><strong>Difficulty</strong><p>"Make the workouts less intense."</p></div></section>
+{% endblock %}
