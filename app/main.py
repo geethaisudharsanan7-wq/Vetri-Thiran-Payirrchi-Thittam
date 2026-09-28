@@ -16,11 +16,11 @@ BASE_DIR = (
 
 
 app = FastAPI(
-    title="FitBuddy - AI Fitness Plan Generator",
-    description=(
-        "AI-powered personalized workout and "
-        "nutrition/recovery planning application."
-    ),
+    title="FitBuddy - Local Fitness Plan Generator",
+   description=(
+    "Local personalized workout and "
+    "nutrition/recovery planning application."
+),
     version="1.0.0",
 )
 

@@ -12,9 +12,7 @@ from sqlalchemy.orm import Session
 
 from .ai import ai_or_demo_tip
 from .ai import ai_or_demo_workout
-from .ai import demo_workout
 from .ai import update_workout_plan
-from .config import settings
 from .crud import get_all_plans
 from .crud import get_all_users
 from .crud import get_latest_plan
@@ -26,15 +24,10 @@ from .database import get_db
 from app.schemas import FeedbackRequest
 from app.schemas import UserInput
 
-
-BASE_DIR = Path(
-    __file__
-).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-templates = Jinja2Templates(
-    directory=BASE_DIR / "templates"
-)
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
 router = APIRouter()
@@ -74,14 +67,12 @@ def home(
 )
 def generate_workout(
     request: Request,
-
     username: str = Form(...),
     user_id: str = Form(...),
     age: int = Form(...),
     weight: float = Form(...),
     goal: str = Form(...),
     intensity: str = Form(...),
-
     db: Session = Depends(get_db),
 ):
 
@@ -109,9 +100,7 @@ def generate_workout(
             user_input.intensity,
         )
 
-        nutrition_tip = ai_or_demo_tip(
-            user_input.goal
-        )
+        nutrition_tip = ai_or_demo_tip(user_input.goal)
 
         plan = save_plan(
             db=db,
@@ -180,10 +169,8 @@ def feedback_page(
 )
 def submit_feedback(
     request: Request,
-
     user_id: str = Form(...),
     feedback: str = Form(...),
-
     db: Session = Depends(get_db),
 ):
 
@@ -205,40 +192,20 @@ def submit_feedback(
         )
 
         if not user:
-            raise ValueError(
-                "User was not found."
-            )
+            raise ValueError("User was not found.")
 
         if not plan:
-            raise ValueError(
-                "No workout plan was found for this user."
-            )
+            raise ValueError("No workout plan was found for this user.")
 
         if not plan.original_plan:
-            raise ValueError(
-                "Original workout plan is empty."
-            )
-
-        if not settings.gemini_api_key:
-
-            updated_plan = (
-                demo_workout(
-                    user.goal,
-                    user.intensity,
-                )
-                + "\n\n"
-                + "Feedback applied:\n"
-                + payload.feedback
-            )
-
-        else:
-
-            updated_plan = update_workout_plan(
-                original_plan=plan.original_plan,
-                feedback=payload.feedback,
-                goal=user.goal,
-                intensity=user.intensity,
-            )
+            raise ValueError("Original workout plan is empty.")
+            
+        updated_plan = update_workout_plan(
+            original_plan=plan.original_plan,
+            feedback=payload.feedback,
+            goal=user.goal,
+            intensity=user.intensity,
+        )
 
         update_plan(
             db=db,
@@ -350,9 +317,7 @@ def api_generate(
             payload.intensity,
         )
 
-        nutrition_tip = ai_or_demo_tip(
-            payload.goal
-        )
+        nutrition_tip = ai_or_demo_tip(payload.goal)
 
         save_plan(
             db=db,
@@ -371,9 +336,7 @@ def api_generate(
 
         return JSONResponse(
             status_code=400,
-            content={
-                "detail": str(exc)
-            },
+            content={"detail": str(exc)},
         )
 
 
@@ -399,42 +362,25 @@ def api_feedback(
 
         return JSONResponse(
             status_code=404,
-            content={
-                "detail":
-                    "User or workout plan not found."
-            },
+            content={"detail": "User or workout plan not found."},
         )
 
     try:
 
-        if not settings.gemini_api_key:
-
-            updated = (
-                demo_workout(
-                    user.goal,
-                    user.intensity,
-                )
-                + "\n\nFeedback applied:\n"
-                + payload.feedback
-            )
-
-        else:
-
-            updated = update_workout_plan(
-                original_plan=plan.original_plan,
-                feedback=payload.feedback,
-                goal=user.goal,
-                intensity=user.intensity,
-            )
-
-        update_plan(
+       updated = update_workout_plan(
+            original_plan=plan.original_plan,
+            feedback=payload.feedback,
+            goal=user.goal,
+            intensity=user.intensity,
+        )
+       update_plan(
             db=db,
             plan=plan,
             updated_plan=updated,
             feedback=payload.feedback,
         )
 
-        return {
+       return {
             "user_id": user.user_id,
             "updated_plan": updated,
         }
@@ -443,7 +389,5 @@ def api_feedback(
 
         return JSONResponse(
             status_code=400,
-            content={
-                "detail": str(exc)
-            },
+            content={"detail": str(exc)},
         )

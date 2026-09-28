@@ -1,364 +1,59 @@
-import json
-import re
-from typing import Any
-
-from .config import settings
-
-
-try:
-    from google import genai
-except ImportError:
-    genai = None
+from typing import Iterable
 
 
 class AIServiceError(RuntimeError):
-    pass
+    """Compatibility error for the local generator."""
 
 
-def _get_client():
-    """
-    Create a Gemini client.
-    """
-
-    if not settings.gemini_api_key:
-        raise AIServiceError(
-            "GEMINI_API_KEY is not configured."
-        )
-
-    if genai is None:
-        raise AIServiceError(
-            "google-genai is not installed."
-        )
-
-    return genai.Client(
-        api_key=settings.gemini_api_key
-    )
-
-
-def _extract_json(text: str) -> Any:
-    """
-    Safely extract JSON from Gemini's response.
-
-    Gemini should return JSON directly, but this also handles
-    accidental markdown code fences.
-    """
-
-    if not text:
-        raise AIServiceError(
-            "Gemini returned an empty response."
-        )
-
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-
-    except json.JSONDecodeError:
-        pass
-
-    match = re.search(
-        r"```(?:json)?\s*(.*?)\s*```",
-        text,
-        flags=re.S | re.I,
-    )
-
-    if match:
-        try:
-            return json.loads(
-                match.group(1)
-            )
-        except json.JSONDecodeError:
-            pass
-
-    start = text.find("{")
-    end = text.rfind("}")
-
-    if start >= 0 and end > start:
-        try:
-            return json.loads(
-                text[start:end + 1]
-            )
-        except json.JSONDecodeError:
-            pass
-
-    raise AIServiceError(
-        "Gemini returned invalid JSON."
-    )
-
-
-def _generate(
-    model: str,
-    prompt: str,
+def _exercise_line(
+    name: str,
+    sets: int,
+    reps: str,
+    rest: str,
 ) -> str:
-
-    client = _get_client()
-
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt,
-        config={
-            "temperature": 0.6,
-            "max_output_tokens": 7000,
-            "response_mime_type": "application/json",
-        },
+    return (
+        f"  • {name}: "
+        f"{sets} sets × {reps}; "
+        f"rest {rest}"
     )
 
-    if not response.text:
-        raise AIServiceError(
-            "Gemini returned an empty response."
-        )
 
-    return response.text
-
-
-def generate_workout_gemini(
-    username: str,
-    age: int,
-    weight: float,
-    goal: str,
+def _intensity_values(
     intensity: str,
-) -> str:
+) -> tuple[int, int, str]:
 
-    prompt = f"""
-You are FitBuddy, an AI fitness planning assistant.
+    level = intensity.strip().lower()
 
-Create a personalized seven-day fitness plan.
+    if level == "low":
+        return 2, 45, "easy"
 
-User:
-Name: {username}
-Age: {age}
-Weight: {weight} kg
-Goal: {goal}
-Workout intensity: {intensity}
+    if level == "high":
+        return 4, 75, "challenging"
 
-Return ONLY valid JSON.
-
-Required JSON structure:
-
-{{
-    "days": [
-        {{
-            "day": "Day 1",
-            "focus": "Full Body",
-            "warmup": "5-10 minutes",
-            "exercises": [
-                {{
-                    "name": "Bodyweight Squat",
-                    "sets": 3,
-                    "reps": "10-12",
-                    "rest": "60 seconds"
-                }}
-            ],
-            "cooldown": "5 minutes"
-        }}
-    ],
-    "safety_note": "..."
-}}
-
-Rules:
-
-1. Return exactly seven days.
-2. Include rest/recovery where appropriate.
-3. Match the requested intensity.
-4. Make the plan practical and easy to follow.
-5. Include warm-up and cooldown.
-6. Include exercise name, sets, reps/duration and rest.
-7. Do not diagnose medical conditions.
-8. Do not provide dangerous or extreme exercise instructions.
-9. Do not prescribe extreme calorie restriction.
-10. Keep the response concise enough for a web application.
-"""
-
-    raw = _generate(
-        settings.workout_model,
-        prompt,
-    )
-
-    data = _extract_json(raw)
-
-    return _format_plan(data)
+    return 3, 60, "moderate"
 
 
-def update_workout_plan(
-    original_plan: str,
-    feedback: str,
-    goal: str,
-    intensity: str,
-) -> str:
+def _format_day(
+    day: str,
+    focus: str,
+    warmup: str,
+    exercises: Iterable[str],
+    cooldown: str,
+) -> list[str]:
 
-    prompt = f"""
-You are FitBuddy.
-
-The user wants to modify an existing seven-day workout plan.
-
-Fitness goal:
-{goal}
-
-Workout intensity:
-{intensity}
-
-User feedback:
-{feedback}
-
-Existing workout plan:
-{original_plan}
-
-Create a revised seven-day plan.
-
-Return ONLY valid JSON using exactly this structure:
-
-{{
-    "days": [
-        {{
-            "day": "Day 1",
-            "focus": "...",
-            "warmup": "...",
-            "exercises": [
-                {{
-                    "name": "...",
-                    "sets": 3,
-                    "reps": "10",
-                    "rest": "60 seconds"
-                }}
-            ],
-            "cooldown": "..."
-        }}
-    ],
-    "safety_note": "..."
-}}
-
-Rules:
-
-1. Exactly seven days.
-2. Apply the user's feedback.
-3. Preserve useful parts of the original plan.
-4. Keep the requested intensity.
-5. Include recovery/rest where appropriate.
-6. Avoid medical diagnosis or treatment.
-7. Avoid extreme or unsafe recommendations.
-"""
-
-    raw = _generate(
-        settings.workout_model,
-        prompt,
-    )
-
-    data = _extract_json(raw)
-
-    return _format_plan(data)
-
-
-def generate_nutrition_tip_with_flash(
-    goal: str,
-) -> str:
-
-    prompt = f"""
-You are FitBuddy.
-
-Give one concise and practical nutrition or recovery tip
-for a person whose fitness goal is:
-
-{goal}
-
-Return ONLY JSON:
-
-{{
-    "tip": "..."
-}}
-
-Rules:
-
-- Keep the tip concise.
-- Make it practical.
-- Avoid medical advice.
-- Avoid extreme dieting.
-- Avoid dangerous supplement recommendations.
-"""
-
-    raw = _generate(
-        settings.tip_model,
-        prompt,
-    )
-
-    data = _extract_json(raw)
-
-    tip = str(
-        data.get(
-            "tip",
-            "",
-        )
-    ).strip()
-
-    if not tip:
-        raise AIServiceError(
-            "Gemini returned an empty nutrition tip."
-        )
-
-    return tip
-
-
-def _format_plan(
-    data: dict,
-) -> str:
-
-    lines = []
-
-    days = data.get(
-        "days",
-        [],
-    )
-
-    for day in days[:7]:
-
-        lines.append(
-            f"{day.get('day', 'Day')} — "
-            f"{day.get('focus', 'Workout')}"
-        )
-
-        lines.append(
-            f"Warm-up: "
-            f"{day.get('warmup', '')}"
-        )
-
-        exercises = day.get(
-            "exercises",
-            [],
-        )
-
-        for exercise in exercises:
-
-            lines.append(
-                "  • "
-                f"{exercise.get('name', 'Exercise')}: "
-                f"{exercise.get('sets', '')} sets × "
-                f"{exercise.get('reps', '')}; "
-                f"rest {exercise.get('rest', '')}"
-            )
-
-        lines.append(
-            f"Cooldown: "
-            f"{day.get('cooldown', '')}"
-        )
-
-        lines.append("")
-
-    safety_note = data.get(
-        "safety_note",
-        "Listen to your body and stop if you feel pain or become unwell.",
-    )
-
-    lines.append(
-        f"Safety note: {safety_note}"
-    )
-
-    return "\n".join(
-        lines
-    ).strip()
-
-
-# ---------------------------------------------------------
-# DEMO / FALLBACK MODE
-# ---------------------------------------------------------
+    return [
+        f"{day} — {focus}",
+        "",
+        "Warm-up:",
+        warmup,
+        "",
+        "Exercises:",
+        *exercises,
+        "",
+        "Cooldown:",
+        cooldown,
+        "",
+    ]
 
 
 def demo_workout(
@@ -366,102 +61,264 @@ def demo_workout(
     intensity: str,
 ) -> str:
 
-    return f"""
-Day 1 — Full Body
+    sets, rest_seconds, level = _intensity_values(
+        intensity
+    )
 
-Warm-up:
-5–10 minutes brisk walking and mobility.
+    rest = f"{rest_seconds} seconds"
 
-Exercises:
-  • Bodyweight Squat: 3 sets × 10–12; rest 60 seconds
-  • Incline Push-up: 3 sets × 8–12; rest 60 seconds
-  • Glute Bridge: 3 sets × 12; rest 45 seconds
+    goal_text = goal.strip().lower()
 
-Cooldown:
-5 minutes easy stretching.
+    if (
+        "cardio" in goal_text
+        or "endurance" in goal_text
+    ):
 
+        day1_focus = "Cardio Endurance"
 
-Day 2 — Cardio
+        day1 = [
+            _exercise_line(
+                "Brisk Walk or Cycling",
+                1,
+                "25–35 minutes",
+                "as needed",
+            ),
+            _exercise_line(
+                "Step-ups",
+                sets,
+                "10 each side",
+                rest,
+            ),
+        ]
 
-Warm-up:
-5 minutes easy walking.
+    elif (
+        "flex" in goal_text
+        or "mobility" in goal_text
+    ):
 
-Exercises:
-  • Brisk Walk or Cycling: 25–30 minutes; rest as needed
+        day1_focus = "Mobility & Full Body"
 
-Cooldown:
-5 minutes easy movement.
+        day1 = [
+            _exercise_line(
+                "Bodyweight Squat",
+                sets,
+                "10–12",
+                rest,
+            ),
+            _exercise_line(
+                "Glute Bridge",
+                sets,
+                "12",
+                rest,
+            ),
+            _exercise_line(
+                "Mobility Flow",
+                2,
+                "8–10 minutes",
+                "as needed",
+            ),
+        ]
 
+    elif (
+        "strength" in goal_text
+        or "muscle" in goal_text
+    ):
 
-Day 3 — Recovery & Mobility
+        day1_focus = "Full Body Strength"
 
-Warm-up:
-5 minutes gentle movement.
+        day1 = [
+            _exercise_line(
+                "Bodyweight Squat",
+                sets,
+                "8–12",
+                rest,
+            ),
+            _exercise_line(
+                "Incline Push-up",
+                sets,
+                "8–12",
+                rest,
+            ),
+            _exercise_line(
+                "Glute Bridge",
+                sets,
+                "10–15",
+                rest,
+            ),
+        ]
 
-Exercises:
-  • Mobility Flow: 15–20 minutes; rest as needed
-  • Easy Walk: 15 minutes; rest as needed
+    else:
 
-Cooldown:
-Gentle stretching.
+        day1_focus = "Full Body Wellness"
 
+        day1 = [
+            _exercise_line(
+                "Bodyweight Squat",
+                sets,
+                "10–12",
+                rest,
+            ),
+            _exercise_line(
+                "Incline Push-up",
+                sets,
+                "8–12",
+                rest,
+            ),
+            _exercise_line(
+                "Glute Bridge",
+                sets,
+                "12",
+                rest,
+            ),
+        ]
 
-Day 4 — Upper Body
+    days: list[str] = []
 
-Warm-up:
-5–10 minutes.
+    days += _format_day(
+        "Day 1",
+        day1_focus,
+        "5–10 minutes brisk walking and mobility.",
+        day1,
+        "5 minutes easy stretching.",
+    )
 
-Exercises:
-  • Incline Push-up: 3 sets × 8–12; rest 60 seconds
-  • Resistance Band Row: 3 sets × 10–12; rest 60 seconds
-  • Shoulder Press: 2 sets × 10; rest 60 seconds
+    days += _format_day(
+        "Day 2",
+        "Cardio",
+        "5 minutes easy walking.",
+        [
+            _exercise_line(
+                "Brisk Walk or Cycling",
+                1,
+                "25–30 minutes",
+                "as needed",
+            )
+        ],
+        "5 minutes easy movement.",
+    )
 
-Cooldown:
-5 minutes.
+    days += _format_day(
+        "Day 3",
+        "Recovery & Mobility",
+        "5 minutes gentle movement.",
+        [
+            _exercise_line(
+                "Mobility Flow",
+                2,
+                "8–10 minutes",
+                "as needed",
+            ),
+            _exercise_line(
+                "Easy Walk",
+                1,
+                "15–20 minutes",
+                "as needed",
+            ),
+        ],
+        "Gentle stretching.",
+    )
 
+    days += _format_day(
+        "Day 4",
+        "Upper Body",
+        "5–10 minutes.",
+        [
+            _exercise_line(
+                "Incline Push-up",
+                sets,
+                "8–12",
+                rest,
+            ),
+            _exercise_line(
+                "Resistance Band Row",
+                sets,
+                "10–12",
+                rest,
+            ),
+            _exercise_line(
+                "Shoulder Press",
+                max(2, sets - 1),
+                "8–10",
+                rest,
+            ),
+        ],
+        "5 minutes.",
+    )
 
-Day 5 — Lower Body
+    days += _format_day(
+        "Day 5",
+        "Lower Body",
+        "5–10 minutes.",
+        [
+            _exercise_line(
+                "Squat",
+                sets,
+                "8–12",
+                rest,
+            ),
+            _exercise_line(
+                "Reverse Lunge",
+                max(2, sets - 1),
+                "8 each side",
+                rest,
+            ),
+            _exercise_line(
+                "Calf Raise",
+                sets,
+                "12–15",
+                rest,
+            ),
+        ],
+        "5 minutes.",
+    )
 
-Warm-up:
-5–10 minutes.
+    days += _format_day(
+        "Day 6",
+        "Light Cardio + Core",
+        "5 minutes.",
+        [
+            _exercise_line(
+                "Easy Cardio",
+                1,
+                "20–25 minutes",
+                "as needed",
+            ),
+            _exercise_line(
+                "Dead Bug",
+                3 if level != "easy" else 2,
+                "8 each side",
+                "45 seconds",
+            ),
+            _exercise_line(
+                "Plank",
+                3 if level == "challenging" else 2,
+                "20–30 seconds",
+                "45 seconds",
+            ),
+        ],
+        "Gentle stretching.",
+    )
 
-Exercises:
-  • Squat: 3 sets × 10; rest 60 seconds
-  • Reverse Lunge: 2 sets × 8 each side; rest 60 seconds
-  • Calf Raise: 3 sets × 12; rest 45 seconds
+    days += [
+        "Day 7 — Rest & Recovery",
+        "",
+        (
+            "Take a full rest day or perform "
+            "an easy walk and light mobility."
+        ),
+        "",
+        f"Goal: {goal}",
+        f"Requested intensity: {intensity}",
+        "",
+    ]
 
-Cooldown:
-5 minutes.
+    days.append(
+        "Safety note: Adjust exercise difficulty "
+        "to your experience and stop if you feel "
+        "pain or become unwell."
+    )
 
-
-Day 6 — Light Cardio + Core
-
-Warm-up:
-5 minutes.
-
-Exercises:
-  • Easy Cardio: 20–25 minutes; rest as needed
-  • Dead Bug: 3 sets × 8 each side; rest 45 seconds
-  • Plank: 3 sets × 20–30 seconds; rest 45 seconds
-
-Cooldown:
-Gentle stretching.
-
-
-Day 7 — Rest & Recovery
-
-Take a full rest day or perform an easy walk and light mobility.
-
-Goal:
-{goal}
-
-Requested intensity:
-{intensity}
-
-Safety note:
-Adjust exercise difficulty to your experience and stop if you feel pain
-or become unwell.
-""".strip()
+    return "\n".join(days).strip()
 
 
 def demo_tip(
@@ -471,24 +328,117 @@ def demo_tip(
     tips = {
 
         "muscle gain":
-            "Include a protein-rich food at each main meal and prioritize sleep and hydration.",
+            (
+                "Include a protein-rich food at "
+                "each main meal and prioritize "
+                "sleep and hydration."
+            ),
 
         "weight loss":
-            "Build meals around vegetables, a protein source, whole foods and water while avoiding overly restrictive dieting.",
+            (
+                "Build meals around vegetables, "
+                "a protein source, whole foods "
+                "and water while avoiding overly "
+                "restrictive dieting."
+            ),
 
         "general wellness":
-            "Aim for regular meals, plenty of water, a varied diet and consistent sleep.",
+            (
+                "Aim for regular meals, plenty "
+                "of water, a varied diet and "
+                "consistent sleep."
+            ),
 
         "flexibility":
-            "Stay hydrated and include a balanced diet with adequate protein to support recovery.",
+            (
+                "Stay hydrated and include a "
+                "balanced diet with adequate "
+                "protein to support recovery."
+            ),
 
         "strength":
-            "Pair resistance training with adequate protein, hydration and recovery.",
+            (
+                "Pair resistance training with "
+                "adequate protein, hydration "
+                "and recovery."
+            ),
     }
 
     return tips.get(
-        goal.lower(),
+        goal.strip().lower(),
         tips["general wellness"],
+    )
+
+
+def update_workout_plan(
+    original_plan: str,
+    feedback: str,
+    goal: str,
+    intensity: str,
+) -> str:
+
+    feedback_lower = feedback.lower()
+
+    revised_intensity = intensity
+
+    if any(
+        word in feedback_lower
+        for word in (
+            "harder",
+            "more intense",
+            "increase",
+            "challenging",
+        )
+    ):
+        revised_intensity = "high"
+
+    elif any(
+        word in feedback_lower
+        for word in (
+            "easier",
+            "less intense",
+            "reduce",
+            "light",
+        )
+    ):
+        revised_intensity = "low"
+
+    plan = demo_workout(
+        goal,
+        revised_intensity,
+    )
+
+    additions = []
+
+    if "cardio" in feedback_lower:
+        additions.append(
+            "Feedback applied: added cardio emphasis."
+        )
+
+    if (
+        "rest" in feedback_lower
+        or "recovery" in feedback_lower
+    ):
+        additions.append(
+            "Feedback applied: prioritize "
+            "additional recovery when needed."
+        )
+
+    if "core" in feedback_lower:
+        additions.append(
+            "Feedback applied: keep the "
+            "Day 6 core work."
+        )
+
+    if not additions:
+        additions.append(
+            f"Feedback applied: {feedback.strip()}"
+        )
+
+    return (
+        plan
+        + "\n\n"
+        + "\n".join(additions)
     )
 
 
@@ -500,19 +450,10 @@ def ai_or_demo_workout(
     intensity: str,
 ) -> str:
 
-    if (
-        settings.ai_mode == "demo"
-        or not settings.gemini_api_key
-    ):
-        return demo_workout(
-            goal,
-            intensity,
-        )
-
-    return generate_workout_gemini(
-        username,
-        age,
-        weight,
+    # Local-only mode.
+    # Parameters are kept for compatibility
+    # with the existing application.
+    return demo_workout(
         goal,
         intensity,
     )
@@ -522,12 +463,4 @@ def ai_or_demo_tip(
     goal: str,
 ) -> str:
 
-    if (
-        settings.ai_mode == "demo"
-        or not settings.gemini_api_key
-    ):
-        return demo_tip(goal)
-
-    return generate_nutrition_tip_with_flash(
-        goal
-    )
+    return demo_tip(goal)
